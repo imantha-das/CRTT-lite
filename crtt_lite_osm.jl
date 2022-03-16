@@ -55,72 +55,84 @@ end
 
 # Agent Step functions ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-# Get agent by type 
-@doc "Return ids of casualties/rescuers by their boolean attributes only" ->
-function agent_by_property(model::ABM, agent_type::DataType, prop::Symbol, prop_value::Bool)::Vector{Int64}
+# Filters agents by type + attributes
+@doc "Return casualties/rescuers by their boolean attributes only" ->
+function agent_by_property(model::ABM, agent_type::DataType, prop::Symbol, prop_value::Bool)::Union{Vector{Casualty}, Vector{Rescuer}}
     if prop_value
-        return [id for id in 1:length(model.agents) if model[id] isa agent_type && getproperty(model[id], prop)]
+        return [model[id] for id in 1:length(model.agents) if model[id] isa agent_type && getproperty(model[id], prop)]
     else
-        return [id for id in 1:length(model.agents) if model[id] isa agent_type && !getproperty(model[id], prop)]
+        return [model[id] for id in 1:length(model.agents) if model[id] isa agent_type && !getproperty(model[id], prop)]
     end
 end
 
-# Get 
-@doc "Finds any casualty to be rescued, needs to be converted through munkres in future" ->
-function find_casualties_awaiting_rescue(model::ABM)
-awaiting_instructions = agent_by_property(model,Rescuer,:awaiting_instructions,true)
-    for i = 1:length(awaiting_instructions)
-        # As long as there is an Causlty to be Saved : Need to Change to Munkres in future
-        if !isempty(agent_by_property(model, Casualty, :awaiting_rescue,true))
-            # get casualties to be rescued (id)
-            casualty_to_be_rescued = agent_by_property(model, Casualty, :awaiting_rescue,true)[i]
-            # get casualty destination
-            destination_at = model[casualty_to_be_rescued].pos 
-            # update casualties properties
-            model[casualty_to_be_rescued].awaiting_rescue = false
-            model[casualty_to_be_rescued].rescued_by = model[awaiting_instructions[i]].id
-            # update rescuer properties
-            model[awaiting_instructions[i]].awaiting_instructions = false
-            model[awaiting_instructions[i]].rescuing_in_progress = true
-            model[awaiting_instructions[i]].casualty_in_rescue = casualty_to_be_rescued
-            model[awaiting_instructions[i]].destination = destination_at
-        end
-    end
+# Updating agent attributes
+@doc "Update agent attributes" ->
+function update_agent_attributes!(agent::Union{Casualty,Rescuer},attr::Dict{Symbol,T}) where T <: Any
+    for (k,v) in attr
+        setfield!(agent,k,v)
+    end 
 end
 
- 
+# Assigns casualties to each rescuer "awaiting instructions"
+@doc "Rescuers : awaiting_instructions, locate casualties" ->
+function find_casualties!(agent,model)
+    # Locate a random casualty who is awaiting rescue
+    casualty_to_be_rescued = agent_by_property(model, Casualty, :awaiting_rescue, true) |> rand
+    # Update rescuer attributes
+    rescuer_attributes = Dict(
+        :casualty_in_rescue => casualty_to_be_rescued.id, 
+        :destination => casualty_to_be_rescued.pos,
+        :awaiting_instructions => false,
+        :rescuing_in_progress => true
+    )
+    update_agent_attributes!(agent, rescuer_attributes)
+    # update casualty attributes
+    casualty_to_be_rescued_attributes = Dict(
+        :awaiting_rescue => false,
+        :rescued_by => agent.id
+    )
+    update_agent_attributes!(casualty_to_be_rescued, casualty_to_be_rescued_attributes)
+end
+
+
 @doc "Move rescuer to destination" ->
-function agent_step!(agent)
+function agent_travel!(agent,model)
     route = OSM.plan_route(agent.pos,agent.destination,model)
     agent.route = route 
     move_along_route!(agent,model,model.dist_per_step)
 end
 
+
 function go!(model::AgentBasedModel)
     # Initiate rescue
-    find_casualties_awaiting_rescue(model)
+    #find_casualties_awaiting_rescue(model)
     # Iterate through all agents
     for (id,agent) in model.agents
-        # Rescuers --> rescue_in_progress
+
+        # Rescuers : awaiting_instructions
+        if (agent isa Rescuer) && (agent.awaiting_instructions)
+            find_casualties!(agent,model)
+        end
+
+        # Rescuers : rescue_in_progress
         if (agent isa Rescuer) && (agent.rescuing_in_progress)
-            agent_step!(agent)
+            agent_travel!(agent,model)
             if is_stationary(agent,model)
                 # Update rescuer attributes
-                agent.rescuing_in_progress = false
-                agent.to_medical = true
+                rescuer_attributes = Dict(:rescuing_in_progress => false, :to_medical => true)
+                update_agent_attributes!(agent, rescuer_attributes)
                 # Update casualty under rescue attributes
+                casualty_attributes = Dict(:awaiting_rescue => false, :in_rescue => true)
                 cas_agent = model[agent.casualty_in_rescue]
-                cas_agent.awaiting_rescue = false
-                cas_agent.in_rescue = true
-
+                update_agent_attributes!(cas_agent, casualty_attributes)
             end
         end
 
-        # Rescuers --> to_medical
+        # Rescuers : to_medical
         if (agent isa Rescuer) && (agent.to_medical)
             rand_pma = filter(x -> x isa PMA, collect(values(model.agents))) |> rand
             agent.destination = rand_pma.pos 
-            agent_step!(agent)
+            agent_travel!(agent,model)
             if is_stationary(agent,model)
                 
             end
@@ -130,10 +142,11 @@ function go!(model::AgentBasedModel)
         if (agent isa Casualty) && (agent.in_rescue)
             pma_dst = model[agent.rescued_by].destination
             agent.destination = pma_dst
-            agent_step!(agent)
+            agent_travel!(agent,model)
             if is_stationary(agent,model)
 
             end
+
         end
     end
 end
@@ -142,7 +155,7 @@ end
 # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 
-model = initialise(num_casualties = 100, num_rescuers = 20, num_medical=2)
+model = initialise(num_casualties = 5, num_rescuers = 1, num_medical=1)
 
 
 frames = @animate for i = ProgressBar(0:200)

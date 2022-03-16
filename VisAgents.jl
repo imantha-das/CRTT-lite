@@ -1,7 +1,7 @@
 # Visualization functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 function agent_color(agent::Union{Casualty,Rescuer,PMA})
     if agent isa Rescuer
-        return :green
+        return :blue
     elseif agent isa PMA
         return :violet
     elseif agent.trauma == 3 && agent isa Casualty
@@ -13,26 +13,40 @@ function agent_color(agent::Union{Casualty,Rescuer,PMA})
     end
 end
 
+function agent_size(agent::Union{Casualty,Rescuer,PMA})
+    if agent isa Rescuer
+        return 6
+    elseif agent isa Casualty
+        return 5
+    elseif agent isa PMA
+        return 8
+    else
+        @show agent
+    end 
+end
+
+function agent_markers(agent::Union{Casualty,Rescuer,PMA})
+    if agent isa Casualty
+        return :circle
+    elseif agent isa Rescuer
+        return :circle
+    elseif agent isa PMA
+        return :square
+    end
+end
+
 function plot_agents(model)
     ids = model.scheduler(model)
     colors = [agent_color(model[id]) for id in ids]
-    #markers = [typeof(model[id]) == Casualty ? :circle : :square for id in ids]
-    markers = Symbol[]
-    for id in ids
-        if model[id] isa Casualty
-            push!(markers, :circle)
-        elseif model[id] isa Rescuer
-            push!(markers, :square)
-        else
-            push!(markers, :square)
-        end
-    end
-
+    sizes = [agent_size(model[id]) for id in ids]
+    markers = [agent_markers(model[id]) for id in ids]
+    
     pos = [OSM.map_coordinates(model[i], model) for i in ids]
     plotmap(model.space.m)
     scatter!(
         pos;
         markercolor = colors,
+        markersize = sizes,
         markershapes = markers,
         label = ""
     )
