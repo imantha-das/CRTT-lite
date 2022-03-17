@@ -80,7 +80,7 @@ function find_casualties!(agent,model)
     casualty_to_be_rescued = agent_by_property(model, Casualty, :awaiting_rescue, true) |> rand
     # Update rescuer attributes
     rescuer_attributes = Dict(
-        :casualty_in_rescue => casualty_to_be_rescued.id, 
+        :travel_to => casualty_to_be_rescued.id, 
         :destination => casualty_to_be_rescued.pos,
         :awaiting_instructions => false,
         :rescuing_in_progress => true
@@ -109,12 +109,12 @@ function go!(model::AgentBasedModel)
     # Iterate through all agents
     for (id,agent) in model.agents
 
-        # Rescuers : awaiting_instructions
+        # Rescuers : awaiting_instructions --> find_casualties
         if (agent isa Rescuer) && (agent.awaiting_instructions)
             find_casualties!(agent,model)
         end
 
-        # Rescuers : rescue_in_progress
+        # Rescuers : rescue_in_progress --> in_rescue
         if (agent isa Rescuer) && (agent.rescuing_in_progress)
             agent_travel!(agent,model)
             if is_stationary(agent,model)
@@ -123,30 +123,43 @@ function go!(model::AgentBasedModel)
                 update_agent_attributes!(agent, rescuer_attributes)
                 # Update casualty under rescue attributes
                 casualty_attributes = Dict(:awaiting_rescue => false, :in_rescue => true)
-                cas_agent = model[agent.casualty_in_rescue]
+                cas_agent = model[agent.travel_to]
                 update_agent_attributes!(cas_agent, casualty_attributes)
             end
         end
 
-        # Rescuers : to_medical
+        # Rescuers : to_medical --> awaiting_instructions (cycle)
         if (agent isa Rescuer) && (agent.to_medical)
+            # Selects PMA to travel to
             rand_pma = filter(x -> x isa PMA, collect(values(model.agents))) |> rand
-            agent.destination = rand_pma.pos 
+            rescuer_attributes = Dict(:destination => rand_pma.pos, :travel_to => rand_pma.id)
+            update_agent_attributes!(agent, rescuer_attributes)
             agent_travel!(agent,model)
             if is_stationary(agent,model)
-                
+                rescuer_attributes = Dict(:to_medical => false, :awaiting_instructions => true)
+                update_agent_attributes!(agent, rescuer_attributes)
             end
         end
 
-        # Casualties --> PMA
+        # Casualties : in_rescue --> in_pma_queue
         if (agent isa Casualty) && (agent.in_rescue)
-            pma_dst = model[agent.rescued_by].destination
-            agent.destination = pma_dst
+            casualty_attributes = Dict(
+                :at_pma => model[agent.rescued_by].travel_to,
+                :destination => model[agent.rescued_by].pos
+            )
+            update_agent_attributes!(agent, casualty_attributes)
             agent_travel!(agent,model)
-            if is_stationary(agent,model)
-
+            final_destination = model[agent.rescued_by].destination # location of pma
+            if agent.pos == final_destination
+                casualty_attributes = Dict(:in_rescue => false, :in_pma_queue => true)
+                update_agent_attributes!(agent, casualty_attributes)
+                push!(model[agent.at_pma].queue, agent.id) #add casualty into PMA's queue
             end
 
+        end
+
+        if (agent isa PMA)
+            @show agent.queue
         end
     end
 end
@@ -158,7 +171,7 @@ end
 model = initialise(num_casualties = 5, num_rescuers = 1, num_medical=1)
 
 
-frames = @animate for i = ProgressBar(0:200)
+frames = @animate for i = ProgressBar(0:300)
     i > 0 && go!(model)
     model.ticks += 1
     plot_agents(model)
