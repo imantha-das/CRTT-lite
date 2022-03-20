@@ -15,22 +15,26 @@ begin
     Pkg.activate(joinpath(homedir(),"workspace","julia","envs","agentsenv"))
 
     using Agents
+    using InteractiveDynamics
     using OpenStreetMapXPlot
     using Plots
     using ProgressBars: ProgressBar
 end
 
 begin
-    include("AgentTypes.jl")
-    include("VisAgents.jl")
+    include("agent_types.jl")
+    include("vis_agents.jl")
+    using .Agent_Types: Casualty, Rescuer, PMA
+    using .Vis_Agents: plot_agents
+    using .Model_plots: plot_queue
 end
 
-function initialise(;map_path=OSM.TEST_MAP,num_casualties, num_rescuers, num_medical)
+function initialise(;map_path=OSM.TEST_MAP,num_casualties, num_rescuers, num_medical, properties)
     model = AgentBasedModel(
         Union{Casualty, Rescuer,PMA},
         OpenStreetMapSpace(map_path),
         scheduler = Schedulers.fastest;
-        properties = Dict(:ticks => 0, :dist_per_step => 50)
+        properties = properties
     )
     # Add casualties to Model
     for i=1:num_casualties
@@ -102,15 +106,38 @@ function agent_travel!(agent,model)
     move_along_route!(agent,model,model.dist_per_step)
 end
 
+@doc "Step Model" ->
+function model_step!(model; stab_open = [60,180], stab_cap = [10,30])
+    # update model  ticks
+    model.ticks += 1
+    # Update stabilisation capacity
+    if model.ticks >= stab_open[1] && model.ticks < stab_open[2]
+        model.stab_cap = stab_cap[1]
+    elseif model.ticks >= stab_open[2]
+        model.stab_cap = stab_cap[2]
+    else 
+        model.stab_cap = 0
+    end
+end
+
+@doc "PMA : Move from queue to stabilisation"
+function queue_to_stabilisation(model,agent)
+    while (length(agent.stabilisation) < model.stab_cap) && (length(agent.queue) > 0)
+        push!(agent.stabilisation, (agent.queue[1][1], model.ticks))
+        popfirst!(agent.queue)
+    end
+end
+
 
 function go!(model::AgentBasedModel)
     # Initiate rescue
     #find_casualties_awaiting_rescue(model)
     # Iterate through all agents
     for (id,agent) in model.agents
-
+        # Are there any casualties to be rescued
+        any_to_be_rescued = filter(x -> x isa Casualty && x.awaiting_rescue == true, model.agents |> values |> collect)
         # Rescuers : awaiting_instructions --> find_casualties
-        if (agent isa Rescuer) && (agent.awaiting_instructions)
+        if (agent isa Rescuer) && (agent.awaiting_instructions) && length(any_to_be_rescued) > 0
             find_casualties!(agent,model)
         end
 
@@ -153,13 +180,14 @@ function go!(model::AgentBasedModel)
             if agent.pos == final_destination
                 casualty_attributes = Dict(:in_rescue => false, :in_pma_queue => true)
                 update_agent_attributes!(agent, casualty_attributes)
-                push!(model[agent.at_pma].queue, agent.id) #add casualty into PMA's queue
+                push!(model[agent.at_pma].queue, (agent.id, model.ticks)) #add casualty into PMA's queue
             end
-
         end
 
         if (agent isa PMA)
-            @show agent.queue
+            queue_to_stabilisation(model,agent)
+            @show agent.queue 
+            @show agent.stabilisation
         end
     end
 end
@@ -168,16 +196,18 @@ end
 # @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 
-model = initialise(num_casualties = 5, num_rescuers = 1, num_medical=1)
+properties = Dict(:ticks => 0, :dist_per_step => 50, :stab_cap => NaN, :stab_time => 20)
+model = initialise(num_casualties = 25, num_rescuers = 10, num_medical=1, properties = properties)
 
 
-frames = @animate for i = ProgressBar(0:300)
+frames = @animate for i = ProgressBar(0:200)
     i > 0 && go!(model)
-    model.ticks += 1
+    model_step!(model,stab_open=[60,180],stab_cap=[10,30])
     plot_agents(model)
 end
 
 gif(frames)
 
 # ----------------------------------------------------------------------------------
+
 
