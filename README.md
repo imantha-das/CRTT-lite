@@ -1,5 +1,4 @@
 # CRTT-lite
-A simple version of the CRTT model ignoring geospatial elements
+An implementation of CRTT model in julia without any visualization elements.
 
-## Notes
-- A work in progress using Julia's Agents.jl library
+
