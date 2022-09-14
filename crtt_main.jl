@@ -67,17 +67,27 @@ end
 At PMA
     + Updates location trajectory
     + Dump casualties into Pma, pre-stabilization-q
+        + (clean up resc-agents rescued field)
+        + 
     + Decide to travel to IZ or Hospital
 """ ->
-function update_agents_at_pma(model::ABM)
+function update_rescuers_at_pma(model::ABM)
     for resc_id in get_resc_by_prop(model,:at_pma)
         # Dump "rescued" casualties into pre stabilization queue
         if model[resc_id].which_pma == "VX"
             push!(model[resc_id].loc_traject, "at_VX") #update location trajectory
             push!(model.pre_stabilize_q_vx, model[resc_id].rescued...) #add rescued agents to pre_stabilization_q_vx
+
+            #todo (require update casualty attributes , please take mortality to account)
+
+            model[resc_id].rescued = [] #cleanup rescued agent list
         else
             push!(model[resc_id].loc_traject, "at_SM") # update location trajectory
             push!(model.pre_stabilize_q_sm, model[resc_id].rescued...) # add rescude agents to pre_stabilization_q_sm
+
+            #todo (require update casualty attributes , please take mortality to account)
+
+            model[resc_id].rescued = [] # cleanup rescued agent list
         end
         # Takes a decision to go either go to IZ or hospital
         decide_next_step!(model, resc_id)
@@ -90,7 +100,7 @@ At IZ
     + Updates location trajectory
     + Decides between PMA or Cas
 """->
-function update_agents_at_iz(model)
+function update_rescuers_at_iz(model)
     for resc_id in get_resc_by_prop(model, :at_iz)
         # Selects between on way to pma and on way to cas
         push!(model[resc_id].loc_traject, "at_iz")
@@ -104,7 +114,7 @@ At Cas
     + Updates rescued casualties by rescuer
     + Decides to go to IZ (deterministic)
 """ ->
-function update_agents_at_cas(model)
+function update_rescuers_at_cas(model)
     for resc_id in get_resc_by_prop(model, :at_cas)
         # Go back to IZ 
         push!(model[resc_id].loc_traject, "at_cas")
@@ -176,7 +186,7 @@ function decide_next_step!(model,resc_id)
     #todo next_step at PMA needs implementation
     # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
     # Decision between IZ or hosp at PMA
-    if model[resc_id].at_pma == true
+    if model[resc_id].at_pma == true 
         # A ticks = 0, we need to account for the rescuers to make unanamous choice to go to IZ 
         if model.ticks == 0
             model[resc_id].at_pma = false 
@@ -191,22 +201,37 @@ function decide_next_step!(model,resc_id)
         # Every other time an rescuer arrives at pma
         else
             model[resc_id].at_pma = false
-            # Go to hospital if there are post_stab_cap has exceeded
+            is_awaiting_rescue = get_awaiting_rescue(model) # Are there any casualties awaiting rescue
+
+            # Priority 1 : Go to hospital if there are post_stab_cap has exceeded 
             if (model[resc_id].which_pma == "VX") && (length(model.post_stabilize_q_vx) > model.post_stab_cap)
                 model[resc_id].on_way_to_hosp = true
                 model[resc_id].dist_to_agent = model.dist_vx_hosp
             elseif (model[resc_id].which_pma == "SM") && (length(model.post_stabilize_q_sm) > model.post_stab_cap)
                 model[resc_id].on_way_to_hosp = true
-                model[resc_id].dist_to_agent = model.dist_vx_hosp
-            # Go to IZ since the post_stab_cap has not exceeded
-            elseif (model[resc_id].which_pma == "VX") && (length(model.post_stabilize_q_vx) < model.post_stab_cap)
+                model[resc_id].dist_to_agent = model.dist_sm_hosp
+            # Priority 2 : Go to IZ since the post_stab_cap has not exceeded
+            elseif (model[resc_id].which_pma == "VX") && (length(model.post_stabilize_q_vx) < model.post_stab_cap) && (length(is_awaiting_rescue) > 0)
                 model[resc_id].on_way_to_iz = true
                 model[resc_id].dist_to_agent = model.dist_vx_iz
-            elseif (model[resc_id].which_pma == "SM") && (length(model.post_stabilize_q_sm) < model.post_stab_cap)
+            elseif (model[resc_id].which_pma == "SM") && (length(model.post_stabilize_q_sm) < model.post_stab_cap) && (length(is_awaiting_rescue) > 0)
                 model[resc_id].on_way_to_iz = true
                 model[resc_id].dist_to_agent = model.dist_sm_iz
+            # Priority 3 : There are no casualties at IZ but there are some in post_stabilize_q
+            elseif (model[resc_id].which_pma == "VX") && (length(model.post_stabilize_q_vx) < model.post_stab_cap) && (length(model.post_stabilize_q_vx) > 0) && (length(is_awaiting_rescue) == 0)
+                model[resc_id].on_way_to_hosp = true
+                model[resc_id].dist_to_agent = model.dist_vx_hosp
+            elseif (model[resc_id].which_pma == "SM") && (length(model.post_stabilize_q_sm) < model.post_stab_cap) && (length(model.post_stabilize_q_sm) > 0) && (length(is_awaiting_rescue) == 0)
+                model[resc_id].on_way_to_hosp = true
+                model[resc_id].dist_to_agent = model.dist_sm_hosp
+            # Priority 4 : There are no casualities at IZ and no casualties in post_stabilize_q but there are some in the other queues (stabilize_q)
+            elseif (model[resc_id].which_pma == "VX") && (length(model.in_stabilize_q_vx) > 0 || length(model.pre_stabilize_q_vx) > 0) && (length(is_awaiting_rescue) == 0)
+                model[resc_id].at_pma = true
+            elseif (model[resc_id].which_pma == "SM") && (length(model.in_stabilize_q_sm) > 0 || length(model.pre_stabilize_q_sm) > 0) && (length(is_awaiting_rescue) == 0)
+                model[resc_id].at_pma = true
+            # Priority 5 : Model run ended
             else
-                printstyled("Rescuer found no actions to take at PMA", color = "red")
+                printstyled("Model Run Ended", color = "green")
             end 
         end
     end
@@ -221,15 +246,22 @@ function decide_next_step!(model,resc_id)
             model[resc_id].at_iz = false
             model[resc_id].on_way_to_cas = true
 
-            # Select closest casualty and update distance
-            closest_cas_id = get_awaiting_rescue(model)[1]
-            model[resc_id].cas_in_rescue = closest_cas_id
-            model[resc_id].dist_to_agent = model[closest_cas_id].dist_from_iz
-            
-            # Update casualty attributes
-            model[closest_cas_id].awaiting_rescue = false
-            model[closest_cas_id].in_rescue = true
-            model[closest_cas_id].rescued_by = resc_id
+            # Check if there are any casualties to survive 
+            if length(get_awaiting_rescue(model)) > 0
+                # Select closest casualty and update distance
+                closest_cas_id = get_awaiting_rescue(model)[1]
+                model[resc_id].cas_in_rescue = closest_cas_id
+                model[resc_id].dist_to_agent = model[closest_cas_id].dist_from_iz
+                
+                # Update casualty attributes
+                model[closest_cas_id].awaiting_rescue = false
+                model[closest_cas_id].in_rescue = true
+                model[closest_cas_id].rescued_by = resc_id
+            # There are no more casualties at IZ - You have rescued every one of them !
+            else
+                model[resc_id].on_way_to_cas = false
+                model[resc_id].on_way_to_pma = true
+            end
         else
             # Rescuer at IZ and decided to travel to pma
             # Update rescuer attributes
@@ -277,53 +309,27 @@ function decide_next_step!(model,resc_id)
 
 end
 
-
-
-
 # ==============================================================================
-# Main Run
+# Update PMA
 # ==============================================================================
-
-begin 
-    properties = Dict(
-        :ticks => 0,
-        :dist_vx_iz => 10000, #10 km
-        :dist_sm_iz => 20000, #20 km
-        :dist_vx_hosp => 40000, #40km
-        :dist_sm_hosp => 30000, #30km
-        :dist_per_step => 30000 / 60, # 30km/60
-        :resc_cap => 2,
-        :stablize_cap => 5,
-        :post_stab_cap => 3, #to be taken to hosp if above this value
-        :burn_bed_cap => 5,
-        :non_burn_bed_cap => 10,
-        :pre_stabilize_q_vx => Int[],
-        :in_stablize_q_vx => Int[],
-        :post_stabilize_q_vx => Int[],
-        :pre_stabilize_q_sm => Int[],
-        :in_stabalize_q_sm => Int[],
-        :post_stabilize_q_sm => Int[],
-        :pre_treatment_q_hosp => Int[],
-        :in_burn_beds => Int[],
-        :in_non_burn_beds => Int[],
-    )
-
-    # Initialise
-    model = initialise(6, 3, properties)
+function update_pma(model)
+    if model.ticks > model.stab_opening_ticks
+        # VX : Add casualty from pre-stabilization-q to stabilization-q
+        while (length(model.in_stabilize_q_vx) < model.stab_cap) && (length(model.pre_stabilize_q_vx) > 0)
+            push!(model.in_stabilize_q_vx,model.pre_stabilize_q_vx[1])
+            popfirst!(model.pre_stabilize_q_vx)
+        end
+        # SM : Add casualty from pre-stabilization-q to stabilization-q
+        while (length(model.in_stabilize_q_sm) < model.stab_cap) && (length(model.pre_stabilize_q_sm) > 0)
+            push!(model.in_stabilize_q_sm,model.pre_stabilize_q_sm[1])
+            popfirst!(model.pre_stabilize_q_sm)
+        end
+    end
 end
 
-for tick = 1:100
-    # Initialise model with agents
-    update_agents_at_pma(model)
-    update_agents_at_iz(model)
-    update_agents_at_cas(model)
-
-    travel_to_loc(model)
-    
-
-    model.ticks += 1
-end
-
+# ==============================================================================
+# Functions for Plotting
+# ==============================================================================
 function plot_rescuer_trajectories(model)
     rescuers = [id for (id,agent) in model.agents if agent isa Resc]
     traces = PlotlyBase.GenericTrace[]
@@ -341,6 +347,63 @@ function plot_rescuer_trajectories(model)
     layout = Layout(title = "Rescuer Trajectory", xaxis_title = "ticks", yaxis_title = "status", width = 900, height = 500, template = "plotly_white")
     return plot(traces, layout)
 end
+
+function print_rescuer_status(model)
+    rescuers = [id for (id,agent) in model.agents if agent isa Resc]
+    for r in rescuers
+
+    end
+end
+
+# ==============================================================================
+# Main Run
+# ==============================================================================
+
+begin 
+    properties = Dict(
+        :ticks => 0,
+        :dist_vx_iz => 10000, #10 km
+        :dist_sm_iz => 20000, #20 km
+        :dist_vx_hosp => 40000, #40km
+        :dist_sm_hosp => 30000, #30km
+        :dist_per_step => 30000 / 60, # 30km/60
+        :stab_opening_ticks => 180, #no of ticks when the stabilization opens up
+        :stab_cap => 3, #no of casualties that can be taken into stabilization
+        :resc_cap => 2,
+        :post_stab_cap => 3, #to be taken to hosp if above this value
+        :burn_bed_cap => 5,
+        :non_burn_bed_cap => 10,
+        :pre_stabilize_q_vx => Int[],
+        :in_stabilize_q_vx => Int[],
+        :post_stabilize_q_vx => Int[],
+        :pre_stabilize_q_sm => Int[],
+        :in_stabilize_q_sm => Int[],
+        :post_stabilize_q_sm => Int[],
+        :pre_treatment_q_hosp => Int[],
+        :in_burn_beds => Int[],
+        :in_non_burn_beds => Int[],
+        :desceased => Array{Tuple{Int,String}}([])
+    )
+
+    # Initialise
+    model = initialise(14, 3, properties)
+end
+
+for tick = 1:500
+    # Initialise model with agents
+    update_rescuers_at_pma(model)
+    update_rescuers_at_iz(model)
+    update_rescuers_at_cas(model)
+    # Update PMA queues
+    update_pma(model)
+
+    travel_to_loc(model)
+    
+
+    model.ticks += 1
+end
+
+
 
 p = plot_rescuer_trajectories(model)
 
