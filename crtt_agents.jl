@@ -14,16 +14,17 @@ module CrttAgents
         awaiting_rescue::Bool #true when a rescuer has not targeted (not coming to rescue) casualty
         in_rescue::Bool #true when a rescuer is coming to rescue
         on_way_to_pma::Bool
-        in_pma_queue::Bool
-        in_stabilization::Bool
+        pre_stabilize_q::Bool
+        in_stabilize_q::Bool
+        post_stabilize_q::Bool
         on_way_to_hosp::Bool
-        in_hosp_queue::Bool
+        in_hosp_q::Bool
         in_burn_beds::Bool
         in_non_burn_beds::Bool
         is_deceased::Bool
 
-        function Cas(id,ts;dist_from_iz = rand(1:1000),rescued_by=999,trans_to_hosp_by=999,at_pma=" ",awaiting_rescue=true,in_rescue=false,on_way_to_pma = false,in_pma_queue=false,in_stabilization=false,on_way_to_hosp=false,in_hosp_queue=false,in_burn_beds=false,in_non_burn_beds=false,is_deceased = false)
-            new(id, ts, dist_from_iz, rescued_by, trans_to_hosp_by, at_pma, awaiting_rescue,in_rescue,on_way_to_pma,in_pma_queue,in_stabilization,on_way_to_hosp,in_hosp_queue,in_burn_beds,in_non_burn_beds, is_deceased)
+        function Cas(id,ts;dist_from_iz = rand(1:1000),rescued_by=999,trans_to_hosp_by=999,at_pma=" ",awaiting_rescue=true,in_rescue=false,on_way_to_pma = false,pre_stabilize_q=false,in_stabilize_q=false,post_stabilize_q = false,on_way_to_hosp=false,in_hosp_q=false,in_burn_beds=false,in_non_burn_beds=false,is_deceased = false)
+            new(id, ts, dist_from_iz, rescued_by, trans_to_hosp_by, at_pma, awaiting_rescue,in_rescue,on_way_to_pma,pre_stabilize_q,in_stabilize_q,post_stabilize_q,on_way_to_hosp,in_hosp_q,in_burn_beds,in_non_burn_beds, is_deceased)
 
         end
     end
