@@ -1,8 +1,6 @@
 module AgentTypes
     using Agents: AbstractAgent
-    
     export Cas, Resc
-
 
     mutable struct Cas <: AbstractAgent
         const id::Int

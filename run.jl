@@ -3,15 +3,18 @@ begin
     Pkg.activate("envs/crtt")
 end
 
-include("agent_types_abm.jl")
-include("pma_hosp_funcs.jl")
-include("cas_funcs.jl")
-include("resc_funcs.jl")
+begin
+    include("agent_types_abm.jl")
+    include("pma_hosp_funcs.jl")
+    include("cas_funcs.jl")
+    include("resc_funcs.jl")
+end
 
-
-using .AgentTypes: Cas, Resc
-using .PmaHosp: vx_q, sm_q, ptp_q
-using .RescFuncs: update_rescuers_at_pma!, print_hello
+begin
+    using .AgentTypes: Cas, Resc
+    using .PmaHosp: vx_q, sm_q, ptp_q
+    using .RescFuncs: update_rescuers_at_pma!
+end
 
 
 (using Agents:
@@ -70,12 +73,7 @@ properties = Dict(
 # ==============================================================================
 model = initalise(10,2,properties)
 
-for i = 1:model.ticks 
+for i = 1:500
     update_rescuers_at_pma!(model)
 end
 
-
-print_hello()
-
-
-update_res
