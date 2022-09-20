@@ -7,14 +7,14 @@ module AgentTypes
     mutable struct Cas <: AbstractAgent
         const id::Int
         const ts::Int
-        status::Symbol # :awaiting_rescue, :in_rescue, :on_way_to_pma, :pre_stabilize_q, :in_stabilize_q, :post_stabilize_q, :on_way_to_pma, :in_hosp_q, :in_burn_beds, :in_non_burn_beds, :deceased
+        status::Symbol # :awaiting_rescue, :in_rescue, :on_way_to_pma, :pre_stabilize_q, :in_stabilize_q, :post_stabilize_q, :on_way_to_pma, :pre_treatment_q, :in_burn_beds, :in_non_burn_beds, :deceased
         dist_from_iz::Float64
         rescued_by::Int
         tans_to_hosp_by::Int
         at_pma::String
-
-        function Cas(id,ts;status == :awaiting_rescue, dist_from_iz = rand(1:1000),rescued_by=999,trans_to_hosp_by=999,at_pma=" ")
-            new(id, ts, status, dist_from_iz, rescued_by, trans_to_hosp_by, at_pma)
+        status_traject::Vector{Symbol}
+        function Cas(id,ts;status=:awaiting_rescue, dist_from_iz = rand(1:1000),rescued_by=999,trans_to_hosp_by=999,at_pma=" ", status_traject=[])
+            new(id, ts, status, dist_from_iz, rescued_by, trans_to_hosp_by, at_pma,status_traject)
         end
     end
 
