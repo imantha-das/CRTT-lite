@@ -12,7 +12,7 @@ end
 
 begin
     using .AgentTypes: Cas, Resc
-    using .PmaHosp: vx_q, sm_q, ptp_q
+    using .PmaHosp: vx, sm, ptp
     using .RescFuncs: update_rescuers_at_pma!
 end
 
@@ -59,12 +59,12 @@ properties = Dict(
     :stab_cap => 3, #no of casualties that can be taken into stabilization
     :stab_time_ticks => 20, #time taken for stabilization
     :resc_cap => 2,
-    :post_stab_cap => 3, #to be taken to hosp if above this value
+    :post_stabilize_cap => 3, #to be taken to hosp if above this value
     :burn_bed_cap => 5,
     :non_burn_bed_cap => 10,
-    :vx_q => vx_q(), #pre_stabilize_q, in_stabilize_q, post_stabilize_q
-    :sm_q => sm_q(), 
-    :ptp_q => ptp_q()
+    :vx => vx(), #pre_stabilize_q, in_stabilize_q, post_stabilize_q
+    :sm => sm(), 
+    :ptp => ptp()
 )
 
 
