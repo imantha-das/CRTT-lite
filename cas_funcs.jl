@@ -11,10 +11,10 @@ module CasFuncs
     @doc """Updates casualty functions"""->
     function update_cas_status!(model::ABM,cas_ids::Array{Int64},update_attr::Symbol)
         for cas_id in cas_ids
-            # Keep track of current status 
-            push!(model[cas_id].status_traject, model[cas_id].status)
             # Update to next status
             setfield!(model[cas_id],:status,update_attr)
+            # Keep track of current status 
+            push!(model[cas_id].status_traject, model[cas_id].status)
         end
     end
 
@@ -27,12 +27,12 @@ module CasFuncs
 
     @doc """Get TS23 casualties"""->
     get_awaiting_rescue_ts23(model::ABM)::Vector{Int} = [
-        (k, v.dist_from_iz) for (k,v) in model.agents if (v isa Cas) && (v.status == :awaiting_rescue) && ((v.ts == 2) || (v.ts == 3))
+        k for (k,v) in model.agents if (v isa Cas) && (v.status == :awaiting_rescue) && ((v.ts == 2) || (v.ts == 3))
     ]
 
     @doc """Get TS1 casualties"""->
     get_awaiting_rescue_ts1(model::ABM)::Vector{Int} = [
-        (k, v.dist_from_iz) for (k,v) in model.agents if (v isa Cas) && (v.status == :awaiting_rescue) && (v.ts == 1)
+        k for (k,v) in model.agents if (v isa Cas) && (v.status == :awaiting_rescue) && (v.ts == 1)
     ]
     
 end

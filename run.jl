@@ -5,24 +5,38 @@ end
 
 begin
     include("agent_types_abm.jl")
-    include("pma_hosp_funcs.jl")
     include("cas_funcs.jl")
+    include("pma_hosp_funcs.jl")
     include("resc_funcs.jl")
+    include("utils.jl")
 end
 
 begin
     using .AgentTypes: Cas, Resc
-    using .PmaHosp: vx, sm, ptp
-    using .RescFuncs: update_rescuers_at_pma!
+    using .PmaHosp: vx, sm, ptp, update_pma_q!
+    (using .RescFuncs: 
+        update_resc_at_pma!, 
+        update_resc_at_iz!, 
+        update_resc_searching_cas!, 
+        update_resc_load_cas_at_iz!,
+        travel_to_loc
+    )
+    #using .CasFuncs: update_cas_status! #required for pma_hosp_funcs
+    using .Utils:plot_resc_traject
 end
 
-
+using Distributions: Normal
 (using Agents:
     ABM, Schedulers, add_agent!, nextid
 )
 
 
 using DrWatson:@dict
+# ------------------------------------------------------------------------------
+# To be move to utils
+# ------------------------------------------------------------------------------
+
+
 
 # ------------------------------------------------------------------------------
 # Initialise
@@ -56,15 +70,16 @@ properties = Dict(
     :dist_sm_hosp => 27000, #27 km
     :dist_per_step => 30000 / 60, # 30km/h = 500m/min
     :stab_opening_ticks => 180, #no of ticks when the stabilization opens up
-    :stab_cap => 3, #no of casualties that can be taken into stabilization
+    :stab_cap => 3, #no of casualties that can be stabalized 
     :stab_time_ticks => 20, #time taken for stabilization
     :resc_cap => 2,
-    :post_stabilize_cap => 3, #to be taken to hosp if above this value
+    :hosp_transfer_cap => 3, #to be taken to hosp if above this value
     :burn_bed_cap => 5,
     :non_burn_bed_cap => 10,
     :vx => vx(), #pre_stabilize_q, in_stabilize_q, post_stabilize_q
     :sm => sm(), 
-    :ptp => ptp()
+    :ptp => ptp(),
+    :search_time => Normal(10,10)
 )
 
 
@@ -73,7 +88,14 @@ properties = Dict(
 # ==============================================================================
 model = initalise(10,2,properties)
 
-for i = 1:500
-    update_rescuers_at_pma!(model)
+for i = 1:1000
+    update_pma_q!(model)
+    update_resc_at_pma!(model)
+    update_resc_at_iz!(model)
+    update_resc_searching_cas!(model)
+    update_resc_load_cas_at_iz!(model)
+    travel_to_loc(model)
+
+    model.ticks += 1
 end
 
