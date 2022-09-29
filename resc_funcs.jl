@@ -219,60 +219,38 @@ module RescFuncs
         # :load_cas_at_pma
         # --------------------------------------------------------------------------
         #! SOMETHING WRONG - NEED SOLVING
+        
         for resc_id in get_resc_by_prop(model, :load_cas_at_pma)
+            
             push!(model[resc_id].loc_traject, "load_cas")
+            # For VX
             if model[resc_id].which_pma == "VX"
-                printstyled("VX", color = :green)    
-                printstyled(model.vx.post_stabilize_q, color = :green)     
-                ts2_in_post_stabilize_q = filter(cas_id -> model[cas_id].ts .== 2, model.vx.post_stabilize_q)
-                ts3_in_post_stabilize_q = filter(cas_id -> model[cas_id].ts .== 3, model.vx.post_stabilize_q)
-                @show (length(model[resc_id].rescued) < model.resc_cap)
-                @show (length(ts2_in_post_stabilize_q) > 0 || length(ts3_in_post_stabilize_q) > 0)
-                while (length(model[resc_id].rescued) < model.resc_cap) && (length(ts2_in_post_stabilize_q) > 0 || length(ts3_in_post_stabilize_q) > 0)
-                    if length(ts2_in_post_stabilize_q) > 0
-                        cas_to_transfer = first(ts2_in_post_stabilize_q)
-                        push!(model[resc_id].rescued, cas_to_transfer)
-                        popfirst!(ts2_in_post_stabilize_q) #delete transfer casualty from temp array 
-                        cas_to_transfer_idx = findfirst(model.vx.post_stabilize_q .== cas_to_transfer)
-                        deleteat!(model.vx.post_stabilize_q, cas_to_transfer_idx) #delete entry from post_stabilize_q
-                    else 
-                        cas_to_transfer = first(ts3_in_post_stabilize_q)
-                        push!(model[resc_id].rescued, cas_to_transfer)
-                        popfirst!(ts3_in_post_stabilize_q) #delete transfer casualty from temp array 
-                        cas_to_transfer_idx = findfirst(model.vx.post_stabilize_q .== cas_to_transfer)
-                        deleteat!(model.vx.post_stabilize_q, cas_to_transfer_idx) #delete entry from post_stabilize_q
-                    end
+                # while (less  than rescued capacity) && (there is atleast one casualty in post stabilize 1)
+                while (length(model[resc_id].rescued) < model.resc_cap) && (length(model.vx.post_stabilize_q) > 0)
+                    cas_to_transfer = first(model.vx.post_stabilize_q)
+                    push!(model[resc_id].rescued, cas_to_transfer)
+                    popfirst!(model.vx.post_stabilize_q)
+                    model[resc_id].status = :on_way_to_hosp # update status
+                    model[resc_id].which_pma = " " #clear which pma your at (since your leaving)
+                    model[resc_id].dist_to_agent = model.dist_vx_hosp #update distance to hosp
+                    update_cas_status!(model, [cas_to_transfer], :on_way_to_hosp)
                 end
-                model[resc_id].status = :on_way_to_hosp # update status
-                model[resc_id].which_pma = " " #clear which pma your at (since your leaving)
-                model[resc_id].dist_to_agent = model.dist_vx_hosp #update distance to hosp
+                
+            # For SM
             else
-                printstyled("SM", color = :blue)
-                printstyled(model.sm.post_stabilize_q, color = :blue)    
-                ts2_in_post_stabilize_q = filter(cas_id -> model[cas_id].ts .== 2, model.sm.post_stabilize_q)
-                ts3_in_post_stabilize_q = filter(cas_id -> model[cas_id].ts .== 3, model.sm.post_stabilize_q)
-                @show (length(model[resc_id].rescued) < model.resc_cap)
-                @show (length(ts2_in_post_stabilize_q) > 0 || length(ts3_in_post_stabilize_q) > 0)
-                while (length(model[resc_id].rescued) < model.resc_cap) && (length(ts2_in_post_stabilize_q) > 0 || length(ts3_in_post_stabilize_q) > 0)
-                    if length(ts2_in_post_stabilize_q) > 0
-                        cas_to_transfer = first(ts2_in_post_stabilize_q)
-                        push!(model[resc_id].rescued, cas_to_transfer)
-                        popfirst!(ts2_in_post_stabilize_q) #delete transfer casualty from temp array 
-                        cas_to_transfer_idx = findfirst(model.sm.post_stabilize_q .== cas_to_transfer)
-                        deleteat!(model.sm.post_stabilize_q, cas_to_transfer_idx) #delete entry from post_stabilize_q
-                    else 
-                        cas_to_transfer = first(ts3_in_post_stabilize_q)
-                        push!(model[resc_id].rescued, cas_to_transfer)
-                        popfirst!(ts3_in_post_stabilize_q) #delete transfer casualty from temp array 
-                        cas_to_transfer_idx = findfirst(model.sm.post_stabilize_q .== cas_to_transfer)
-                        deleteat!(model.sm.post_stabilize_q, cas_to_transfer_idx) #delete entry from post_stabilize_q
-                    end
+                # while (less  than rescued capacity) && (there is atleast one casualty in post stabilize 1)
+                while (length(model[resc_id].rescued) < model.resc_cap) && (length(model.sm.post_stabilize_q) > 0)
+                    cas_to_transfer = first(model.sm.post_stabilize_q)
+                    push!(model[resc_id].rescued, cas_to_transfer)
+                    popfirst!(model.sm.post_stabilize_q)
+                    model[resc_id].status = :on_way_to_hosp #update status
+                    model[resc_id].which_pma = " " # clear which pma your at (since your leaving)
+                    model[resc_id].dist_to_agent = model.dist_sm_hosp #update distance
+                    update_cas_status!(model, [cas_to_transfer], :on_way_to_hosp)
                 end
-                model[resc_id].status = :on_way_to_hosp #update status
-                model[resc_id].which_pma = " " # clear which pma your at (since your leaving)
-                model[resc_id].dist_to_agent = model.dist_sm_hosp #update distance
-            end
+            end      
         end
+    
     end
 
     # ==========================================================================

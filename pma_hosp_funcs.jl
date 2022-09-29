@@ -9,6 +9,7 @@ module PmaHosp
         pre_stabilize_q::Vector{Int} = Int[]
         in_stabilize_q::Vector{Tuple{Int,Int}} = Vector{Tuple{Int,Int}}([])
         post_stabilize_q::Vector{Int} = Int[]
+        recovered::Vector{Int} = Int[]
     end
 
     @doc """Sainte Marie PMA queues"""->
@@ -16,6 +17,7 @@ module PmaHosp
         pre_stabilize_q::Vector{Int} = Int[]
         in_stabilize_q::Vector{Tuple{Int,Int}} = Vector{Tuple{Int,Int}}([])
         post_stabilize_q::Vector{Int} = Int[]
+        recovered::Vector{Int} = Int[]
     end
 
     @doc """Point Pitre Hospital queues"""
@@ -23,6 +25,16 @@ module PmaHosp
         pre_treatment_q::Vector{Int} = Int[]
         in_burn_beds::Vector{Int} = Int[]
         in_non_burn_beds::Vector{Int} = Int[]
+    end
+
+    @doc """ 
+    Desc : Rearranges casualties based on TS, where ts2 takes precedence over ts3
+    """ ->
+    function rearrange_post_stablize_q(model,post_stabilize_q)
+        post_stab_q_ts2 = Int64[]
+        post_stab_q_ts3 = Int64[]
+        map(cas_id -> model[cas_id].ts == 2 ? push!(post_stab_q_ts2, cas_id) : push!(post_stab_q_ts3, cas_id), post_stabilize_q)
+        return vcat(post_stab_q_ts2, post_stab_q_ts3)
     end
 
     @doc """
@@ -61,9 +73,18 @@ module PmaHosp
             while i <= length(model.vx.in_stabilize_q) && length(model.vx.in_stabilize_q) > 0
                 cas_to_transfer, stab_ticks = first(model.vx.in_stabilize_q)
                 if (model.ticks - stab_ticks) > model.stab_time_ticks 
-                    push!(model.vx.post_stabilize_q, cas_to_transfer)
-                    deleteat!(model.vx.in_stabilize_q, i)
-                    update_cas_status!(model,[cas_to_transfer], :in_post_stabilize_q)
+                    # If casualties are TS23
+                    if model[cas_to_transfer].ts == 2 || model[cas_to_transfer].ts == 3
+                        push!(model.vx.post_stabilize_q, cas_to_transfer)
+                        popfirst!(model.vx.in_stabilize_q)
+                        update_cas_status!(model,[cas_to_transfer], :in_post_stabilize_q)
+                        model.vx.post_stabilize_q = rearrange_post_stablize_q(model, model.vx.post_stabilize_q) #rearranges TS2 and T3 with TS2 taking precedence
+                    # If casualties are TS1
+                    else
+                        push!(model.vx.recovered, cas_to_transfer)
+                        popfirst!(model.vx.in_stabilize_q)
+                        update_cas_status!(model, [cas_to_transfer], :recovered)
+                    end
                 end
                 i += 1
             end
@@ -73,9 +94,18 @@ module PmaHosp
             while i <= length(model.sm.in_stabilize_q) && length(model.sm.in_stabilize_q) > 0
                 cas_to_transfer, stab_ticks = first(model.sm.in_stabilize_q)
                 if (model.ticks - stab_ticks) > model.stab_time_ticks 
-                    push!(model.sm.post_stabilize_q, cas_to_transfer)
-                    deleteat!(model.sm.in_stabilize_q, i)
-                    update_cas_status!(model,[cas_to_transfer], :in_post_stabilize_q)
+                    # If casualties are TS23 
+                    if model[cas_to_transfer].ts == 2 || model[cas_to_transfer].ts == 3
+                        push!(model.sm.post_stabilize_q, cas_to_transfer)
+                        popfirst!(model.sm.in_stabilize_q)
+                        update_cas_status!(model,[cas_to_transfer], :in_post_stabilize_q)
+                        model.sm.post_stabilize_q = rearrange_post_stablize_q(model, model.sm.post_stabilize_q) #rearranges TS2 and T3 with TS2 taking precedence
+                    # If casualties are TS1
+                    else
+                        push!(model.vx.recovered, cas_to_transfer)
+                        popfirst!(model.sm.in_stabilize_q)
+                        update_cas_status!(model, [cas_to_transfer], :recovered)
+                    end
                 end
                 i += 1
             end

@@ -1,6 +1,7 @@
 begin
     using Pkg 
     Pkg.activate("envs/crtt")
+    push!(LOAD_PATH,".")
 end
 
 begin
@@ -33,9 +34,28 @@ using Distributions: Normal
 
 using DrWatson:@dict
 # ------------------------------------------------------------------------------
-# To be move to utils
+# Checking Array function
 # ------------------------------------------------------------------------------
-
+function check_repeat(model)
+    if length(model.vx.pre_stabilize_q) != length(unique(model.vx.pre_stabilize_q)) 
+        prinstyled("issue with vx pre_stabilization_q", color = :red)
+    end
+    if length(model.vx.in_stabilize_q) != length(unique(model.vx.in_stabilize_q)) 
+        prinstyled("issue with vx in_stabilization_q", color = :red)
+    end
+    if length(model.vx.post_stabilize_q) != length(unique(model.vx.post_stabilize_q)) 
+        printstyled("issue with vx post_stabilization_q", color = :red)
+    end
+    if length(model.sm.pre_stabilize_q) != length(unique(model.sm.pre_stabilize_q)) 
+        printstyled("issue with sm pre_stabilization_q", color = :red)
+    end
+    if length(model.sm.in_stabilize_q) != length(unique(model.sm.in_stabilize_q)) 
+        printstyled("issue with vx in_stabilization_q", color = :red)
+    end
+    if length(model.sm.post_stabilize_q) != length(unique(model.sm.post_stabilize_q)) 
+        printstyled("issue with vx post_stabilization_q", color = :red)
+    end
+end
 
 
 # ------------------------------------------------------------------------------
@@ -96,14 +116,14 @@ for i = 1:1000
     update_resc_load_cas_at_iz!(model)
     travel_to_loc(model)
 
+    check_repeat(model)
+
     model.ticks += 1
 end
 
-model.vx
 
-function get_ts23_in_post_stabilize_q(model)
-    
 
-end
 
-filter(cas_id -> model[cas_id].ts == 3, model.vx.post_stabilize_q)
+
+
+
