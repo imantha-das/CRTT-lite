@@ -99,3 +99,11 @@ for i = 1:1000
     model.ticks += 1
 end
 
+model.vx
+
+function get_ts23_in_post_stabilize_q(model)
+    
+
+end
+
+filter(cas_id -> model[cas_id].ts == 3, model.vx.post_stabilize_q)

@@ -72,7 +72,6 @@ module RescFuncs
                 end
             #* @ticks != 0
             else
-                #todo Make sure you Check if there are TS23 agents in IZ. If no you should go to hospital first
                 # -------------------------------------------------------------- VX
                 if model[resc_id].which_pma == "VX"
                     # Priotity 1 : hosp_transfer_cap
@@ -86,7 +85,7 @@ module RescFuncs
                         println("prority 2")
                     # priority 3 : hosp transfer cap not reached but there are ts23 casualties in post stabilize q and there are no ts23 agent awaiting rescue 
                     elseif (length(model.vx.post_stabilize_q) < length(model.hosp_transfer_cap)) && (length(get_awaiting_rescue_ts23(model)) == 0)
-                        model[rescid].status = :load_cas_at_pma
+                        model[resc_id].status = :load_cas_at_pma
                         println("priority 3")
                     # priority 4 : hosp transfer cap not reached but there are ts23 agents in either pre_stabilize_q or in_stabilize_q and there are no ts23 agents awaiting rescue
                     elseif (length(model.vx.post_stabilize_q) < length(model.hosp_transfer_cap)) && (length(model.vx.pre_stabilize_q) > 0 || length(model.vx.in_stabilize_q) > 0) && (length(get_awaiting_rescue_ts23(model)) == 0)
@@ -219,12 +218,59 @@ module RescFuncs
         # --------------------------------------------------------------------------
         # :load_cas_at_pma
         # --------------------------------------------------------------------------
+        #! SOMETHING WRONG - NEED SOLVING
         for resc_id in get_resc_by_prop(model, :load_cas_at_pma)
+            push!(model[resc_id].loc_traject, "load_cas")
             if model[resc_id].which_pma == "VX"
-                push!(model[resc_id].loc_traject, "load_cas")
-                #todo search for ts2 casualties if not ts3 casualties in post_stabilize_q
+                printstyled("VX", color = :green)    
+                printstyled(model.vx.post_stabilize_q, color = :green)     
+                ts2_in_post_stabilize_q = filter(cas_id -> model[cas_id].ts .== 2, model.vx.post_stabilize_q)
+                ts3_in_post_stabilize_q = filter(cas_id -> model[cas_id].ts .== 3, model.vx.post_stabilize_q)
+                @show (length(model[resc_id].rescued) < model.resc_cap)
+                @show (length(ts2_in_post_stabilize_q) > 0 || length(ts3_in_post_stabilize_q) > 0)
+                while (length(model[resc_id].rescued) < model.resc_cap) && (length(ts2_in_post_stabilize_q) > 0 || length(ts3_in_post_stabilize_q) > 0)
+                    if length(ts2_in_post_stabilize_q) > 0
+                        cas_to_transfer = first(ts2_in_post_stabilize_q)
+                        push!(model[resc_id].rescued, cas_to_transfer)
+                        popfirst!(ts2_in_post_stabilize_q) #delete transfer casualty from temp array 
+                        cas_to_transfer_idx = findfirst(model.vx.post_stabilize_q .== cas_to_transfer)
+                        deleteat!(model.vx.post_stabilize_q, cas_to_transfer_idx) #delete entry from post_stabilize_q
+                    else 
+                        cas_to_transfer = first(ts3_in_post_stabilize_q)
+                        push!(model[resc_id].rescued, cas_to_transfer)
+                        popfirst!(ts3_in_post_stabilize_q) #delete transfer casualty from temp array 
+                        cas_to_transfer_idx = findfirst(model.vx.post_stabilize_q .== cas_to_transfer)
+                        deleteat!(model.vx.post_stabilize_q, cas_to_transfer_idx) #delete entry from post_stabilize_q
+                    end
+                end
+                model[resc_id].status = :on_way_to_hosp # update status
+                model[resc_id].which_pma = " " #clear which pma your at (since your leaving)
+                model[resc_id].dist_to_agent = model.dist_vx_hosp #update distance to hosp
             else
-                #todo do the above to sm pma
+                printstyled("SM", color = :blue)
+                printstyled(model.sm.post_stabilize_q, color = :blue)    
+                ts2_in_post_stabilize_q = filter(cas_id -> model[cas_id].ts .== 2, model.sm.post_stabilize_q)
+                ts3_in_post_stabilize_q = filter(cas_id -> model[cas_id].ts .== 3, model.sm.post_stabilize_q)
+                @show (length(model[resc_id].rescued) < model.resc_cap)
+                @show (length(ts2_in_post_stabilize_q) > 0 || length(ts3_in_post_stabilize_q) > 0)
+                while (length(model[resc_id].rescued) < model.resc_cap) && (length(ts2_in_post_stabilize_q) > 0 || length(ts3_in_post_stabilize_q) > 0)
+                    if length(ts2_in_post_stabilize_q) > 0
+                        cas_to_transfer = first(ts2_in_post_stabilize_q)
+                        push!(model[resc_id].rescued, cas_to_transfer)
+                        popfirst!(ts2_in_post_stabilize_q) #delete transfer casualty from temp array 
+                        cas_to_transfer_idx = findfirst(model.sm.post_stabilize_q .== cas_to_transfer)
+                        deleteat!(model.sm.post_stabilize_q, cas_to_transfer_idx) #delete entry from post_stabilize_q
+                    else 
+                        cas_to_transfer = first(ts3_in_post_stabilize_q)
+                        push!(model[resc_id].rescued, cas_to_transfer)
+                        popfirst!(ts3_in_post_stabilize_q) #delete transfer casualty from temp array 
+                        cas_to_transfer_idx = findfirst(model.sm.post_stabilize_q .== cas_to_transfer)
+                        deleteat!(model.sm.post_stabilize_q, cas_to_transfer_idx) #delete entry from post_stabilize_q
+                    end
+                end
+                model[resc_id].status = :on_way_to_hosp #update status
+                model[resc_id].which_pma = " " # clear which pma your at (since your leaving)
+                model[resc_id].dist_to_agent = model.dist_sm_hosp #update distance
             end
         end
     end
@@ -269,7 +315,7 @@ module RescFuncs
         * rescued < resc_cap ALREADY CHECKED at Decide_on_next_step! :at_iz
         + ts23 > 0 -> add ts23 agent to rescued
             - update cas status
-    #!      - update resc status
+    #?      - update resc status
         + ts23 < 0 -> add ts1 agent to rescued 
     """->
     function update_resc_load_cas_at_iz!(model::ABM)
@@ -343,7 +389,6 @@ end
         mutable struct Resc <: AbstractAgent
         const id::Int
         status::Symbol # :at_iz, :on_way_to_iz, :search_time, :load_cas_at_iz, :at_pma, :load_cas_at_pma, :on_way_to_pma, :at_hosp, :on_way_to_hosp, rescue_finished
-        cas_in_rescue::Int - DELETE
         dist_to_agent::Float64
         rescued::Vector{Int}
         which_pma::String   
