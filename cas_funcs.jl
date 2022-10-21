@@ -14,7 +14,7 @@ module CasFuncs
             # Update to next status
             setfield!(model[cas_id],:status,update_attr)
             # Keep track of current status 
-            push!(model[cas_id].status_traject, model[cas_id].status)
+            push!(model[cas_id].status_traject, (model[cas_id].status,model.ticks))
         end
     end
 
