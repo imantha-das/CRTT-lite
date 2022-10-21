@@ -9,8 +9,8 @@ module AgentTypes
         rescued_by::Int
         tans_to_hosp_by::Int
         at_pma::String
-        status_traject::Vector{Symbol}
-        function Cas(id,ts;status=:awaiting_rescue,rescued_by=999,trans_to_hosp_by=999,at_pma=" ", status_traject=[:awaiting_rescue])
+        status_traject::Vector{Tuple{Symbol,Int}}
+        function Cas(id,ts;status=:awaiting_rescue,rescued_by=999,trans_to_hosp_by=999,at_pma=" ", status_traject=[(:awaiting_rescue,0)])
             new(id, ts, status, rescued_by, trans_to_hosp_by, at_pma,status_traject)
         end
     end
