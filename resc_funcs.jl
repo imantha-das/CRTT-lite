@@ -237,7 +237,7 @@ module RescFuncs
                 end
                 
             # For SM
-            else
+            elseif model[resc_id].which_pma == "SM"
                 # while (less  than rescued capacity) && (there is atleast one casualty in post stabilize 1)
                 while (length(model[resc_id].rescued) < model.resc_cap) && (length(model.sm.post_stabilize_q) > 0)
                     cas_to_transfer = first(model.sm.post_stabilize_q)
@@ -248,6 +248,8 @@ module RescFuncs
                     model[resc_id].dist_to_agent = model.dist_sm_hosp #update distance
                     update_cas_status!(model, [cas_to_transfer], :on_way_to_hosp)
                 end
+            else
+                @assert (model[resc_id].which_pma == "SM") || (model[resc_id].which_pma == "VX") "Got a result other than VX or SM for .which_pma"
             end      
         end
     
