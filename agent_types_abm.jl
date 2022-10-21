@@ -9,9 +9,10 @@ module AgentTypes
         rescued_by::Int
         tans_to_hosp_by::Int
         at_pma::String
+        stab_ticker::Int
         status_traject::Vector{Tuple{Symbol,Int}}
-        function Cas(id,ts;status=:awaiting_rescue,rescued_by=999,trans_to_hosp_by=999,at_pma=" ", status_traject=[(:awaiting_rescue,0)])
-            new(id, ts, status, rescued_by, trans_to_hosp_by, at_pma,status_traject)
+        function Cas(id,ts;status=:awaiting_rescue,rescued_by=999,trans_to_hosp_by=999,at_pma=" ",stab_ticker = 0, status_traject=[(:awaiting_rescue,0)])
+            new(id, ts, status, rescued_by, trans_to_hosp_by,at_pma,stab_ticker,status_traject)
         end
     end
 
@@ -23,9 +24,10 @@ module AgentTypes
         which_pma::String   
         dist_traject::Vector{Float64}
         loc_traject::Vector{String}
+        total_cas_rescued::Vector{Vector{Int}}
         search_time::Int
-        function Resc(id;status=:at_pma,dist_to_agent=999,rescued = Int[],which_pma = rand(["VX","SM"]),dist_traject=Float64[],loc_traject=String[],search_time = 999)
-            new(id,status,dist_to_agent,rescued,which_pma,dist_traject,loc_traject, search_time)
+        function Resc(id;status=:at_pma,dist_to_agent=999,rescued = Int[],which_pma = rand(["VX","SM"]),dist_traject=Float64[],loc_traject=String[],total_cas_rescued=[],search_time = 999)
+            new(id,status,dist_to_agent,rescued,which_pma,dist_traject,loc_traject, total_cas_rescued,search_time)
         end
     end
 end

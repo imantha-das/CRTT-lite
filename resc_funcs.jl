@@ -147,6 +147,7 @@ module RescFuncs
             # rescuer cap full or there are no agents to save : ():at_iz -> :on_way_to_pma)
             else
                 model[resc_id].status = :on_way_to_pma
+                push!(model[resc_id].total_cas_rescued, model[resc_id].rescued) #JUST for checking code purposes
                 # Go to VX (priotiry 1) or SM (priority 2) if the hosp_transfer_cap has reached since you need to casualtiy to PtP
                 if length(model.vx.post_stabilize_q) > length(model.hosp_transfer_cap)
                     model[resc_id].which_pma = "VX"
@@ -220,38 +221,38 @@ module RescFuncs
         # --------------------------------------------------------------------------
         #! SOMETHING WRONG - NEED SOLVING
         
-        for resc_id in get_resc_by_prop(model, :load_cas_at_pma)
+        # for resc_id in get_resc_by_prop(model, :load_cas_at_pma)
             
-            push!(model[resc_id].loc_traject, "load_cas")
-            # For VX
-            if model[resc_id].which_pma == "VX"
-                # while (less  than rescued capacity) && (there is atleast one casualty in post stabilize 1)
-                while (length(model[resc_id].rescued) < model.resc_cap) && (length(model.vx.post_stabilize_q) > 0)
-                    cas_to_transfer = first(model.vx.post_stabilize_q)
-                    push!(model[resc_id].rescued, cas_to_transfer)
-                    popfirst!(model.vx.post_stabilize_q)
-                    model[resc_id].status = :on_way_to_hosp # update status
-                    model[resc_id].which_pma = " " #clear which pma your at (since your leaving)
-                    model[resc_id].dist_to_agent = model.dist_vx_hosp #update distance to hosp
-                    update_cas_status!(model, [cas_to_transfer], :on_way_to_hosp)
-                end
+        #     push!(model[resc_id].loc_traject, "load_cas")
+        #     # For VX
+        #     if model[resc_id].which_pma == "VX"
+        #         # while (less  than rescued capacity) && (there is atleast one casualty in post stabilize 1)
+        #         while (length(model[resc_id].rescued) < model.resc_cap) && (length(model.vx.post_stabilize_q) > 0)
+        #             cas_to_transfer = first(model.vx.post_stabilize_q)
+        #             push!(model[resc_id].rescued, cas_to_transfer)
+        #             popfirst!(model.vx.post_stabilize_q)
+        #             model[resc_id].status = :on_way_to_hosp # update status
+        #             model[resc_id].which_pma = " " #clear which pma your at (since your leaving)
+        #             model[resc_id].dist_to_agent = model.dist_vx_hosp #update distance to hosp
+        #             update_cas_status!(model, [cas_to_transfer], :on_way_to_hosp)
+        #         end
                 
-            # For SM
-            elseif model[resc_id].which_pma == "SM"
-                # while (less  than rescued capacity) && (there is atleast one casualty in post stabilize 1)
-                while (length(model[resc_id].rescued) < model.resc_cap) && (length(model.sm.post_stabilize_q) > 0)
-                    cas_to_transfer = first(model.sm.post_stabilize_q)
-                    push!(model[resc_id].rescued, cas_to_transfer)
-                    popfirst!(model.sm.post_stabilize_q)
-                    model[resc_id].status = :on_way_to_hosp #update status
-                    model[resc_id].which_pma = " " # clear which pma your at (since your leaving)
-                    model[resc_id].dist_to_agent = model.dist_sm_hosp #update distance
-                    update_cas_status!(model, [cas_to_transfer], :on_way_to_hosp)
-                end
-            else
-                @assert (model[resc_id].which_pma == "SM") || (model[resc_id].which_pma == "VX") "Got a result other than VX or SM for .which_pma"
-            end      
-        end
+        #     # For SM
+        #     elseif model[resc_id].which_pma == "SM"
+        #         # while (less  than rescued capacity) && (there is atleast one casualty in post stabilize 1)
+        #         while (length(model[resc_id].rescued) < model.resc_cap) && (length(model.sm.post_stabilize_q) > 0)
+        #             cas_to_transfer = first(model.sm.post_stabilize_q)
+        #             push!(model[resc_id].rescued, cas_to_transfer)
+        #             popfirst!(model.sm.post_stabilize_q)
+        #             model[resc_id].status = :on_way_to_hosp #update status
+        #             model[resc_id].which_pma = " " # clear which pma your at (since your leaving)
+        #             model[resc_id].dist_to_agent = model.dist_sm_hosp #update distance
+        #             update_cas_status!(model, [cas_to_transfer], :on_way_to_hosp)
+        #         end
+        #     else
+        #         @assert (model[resc_id].which_pma == "SM") || (model[resc_id].which_pma == "VX") "Got a result other than VX or SM for .which_pma"
+        #     end      
+        # end
     
     end
 
